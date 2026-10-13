@@ -2,7 +2,7 @@ name: SRS YouTube LIVE
 
 on:
   schedule:
-    - cron: "*/5 * * * *"
+    - cron: "*/30 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -29,6 +29,7 @@ jobs:
           YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
           YOUTUBE_CHANNEL_ID: ${{ secrets.YOUTUBE_CHANNEL_ID }}
+          DISCORD_ROLE_ID: ${{ secrets.DISCORD_ROLE_ID }}
         run: python main.py
 
       - name: Zapisz stan filmów i transmisji
