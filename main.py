@@ -75,7 +75,7 @@ def main():
         embed["image"] = {"url": live["thumbnail"]}
 
     payload = {
-        "content": "🏁 @everyone **SRS NADAJE NA ŻYWO!** 🔴",
+        "content": "🏁 @Społeczność **SRS NADAJE NA ŻYWO!** 🔴",
         "embeds": [embed],
         "allowed_mentions": {"parse": ["everyone"]}
     }
