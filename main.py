@@ -22,7 +22,7 @@ def load_state():
 
 def save_state(state):
     with open(STATE_FILE, "w", encoding="utf-8") as f:
-        json.dump(state, f)
+        json.dump(state, f, ensure_ascii=False, indent=2)
 
 
 def youtube_search(**params):
@@ -40,8 +40,8 @@ def youtube_search(**params):
         timeout=20
     )
     response.raise_for_status()
-    items = response.json().get("items", [])
-    return items[0] if items else None
+
+    return response.json().get("items", [])
 
 
 def make_video(item):
@@ -65,14 +65,14 @@ def make_video(item):
     }
 
 
-def get_video():
-    item = youtube_search(order="date")
-    return make_video(item) if item else None
+def get_latest_video():
+    items = youtube_search(order="date")
+    return make_video(items[0]) if items else None
 
 
 def get_live():
-    item = youtube_search(eventType="live")
-    return make_video(item) if item else None
+    items = youtube_search(eventType="live")
+    return make_video(items[0]) if items else None
 
 
 def send_discord(video, live=False):
@@ -114,27 +114,34 @@ def send_discord(video, live=False):
         }
     }
 
-    response = requests.post(
-        WEBHOOK,
-        json=payload,
-        timeout=20
-    )
+    response = requests.post(WEBHOOK, json=payload, timeout=20)
     response.raise_for_status()
-    print("Wysłano:", video["title"])
+
+    print(f"Wysłano {'LIVE' if live else 'FILM'}: {video['title']}")
 
 
 def main():
     state = load_state()
 
-    video = get_video()
-    if video and video["id"] != state.get("video", ""):
-        send_discord(video, live=False)
-        state["video"] = video["id"]
-
+    # Najpierw sprawdź transmisję na żywo.
     live = get_live()
-    if live and live["id"] != state.get("live", ""):
+    live_id = live["id"] if live else ""
+
+    if live and live_id != state.get("live", ""):
         send_discord(live, live=True)
-        state["live"] = live["id"]
+        state["live"] = live_id
+
+    # Następnie sprawdź najnowszy film.
+    video = get_latest_video()
+
+    if video:
+        video_id = video["id"]
+
+        # Nie wysyłaj tej samej transmisji ponownie jako filmu.
+        if video_id != live_id and video_id != state.get("video", ""):
+            send_discord(video, live=False)
+
+        state["video"] = video_id
 
     save_state(state)
 
