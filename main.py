@@ -28,8 +28,8 @@ def load_state():
 
             return state
 
-        except (json.JSONDecodeError, OSError):
-            print("Nie można odczytać stanu. Używam pustego stanu.")
+        except (json.JSONDecodeError, OSError) as error:
+            print(f"Nie można odczytać historii: {error}")
 
     return default_state
 
@@ -101,17 +101,24 @@ def make_video(item):
 
 
 def get_live():
+    print("Szukam aktywnej transmisji SRS...")
+
     items = youtube_search(
         eventType="live",
-        order="date"
+        order="date",
+        maxResults=10
     )
+
+    print(f"Aktywne transmisje zwrócone przez YouTube: {len(items)}")
 
     for item in items:
         video = make_video(item)
 
         if video:
+            print(f"Znaleziono LIVE: {video['title']}")
             return video
 
+    print("YouTube API nie zwróciło aktywnego LIVE.")
     return None
 
 
@@ -125,14 +132,13 @@ def get_latest_videos():
         if video:
             videos.append(video)
 
+    print(f"Znalezione materiały na kanale: {len(videos)}")
     return videos
 
 
 def get_video_details(video_ids):
     details = {}
 
-    # YouTube API pozwala sprawdzać maksymalnie
-    # 50 identyfikatorów w jednym zapytaniu.
     for start in range(0, len(video_ids), 50):
         batch = video_ids[start:start + 50]
 
@@ -155,11 +161,8 @@ def get_video_details(video_ids):
 
 def is_live_archive(details):
     """
-    Rozpoznaje materiały powiązane z transmisjami.
-
-    Zakończone transmisje mogą nadal mieć actualStartTime
-    w liveStreamingDetails, dlatego nie należy traktować
-    ich jako zwykłych filmów.
+    Rozpoznaje aktywne, zaplanowane i zakończone transmisje,
+    jeśli YouTube API udostępnia informacje o transmisji.
     """
     if not details:
         return False
@@ -167,10 +170,13 @@ def is_live_archive(details):
     snippet = details.get("snippet", {})
     live_details = details.get("liveStreamingDetails", {})
 
+    if snippet.get("liveBroadcastContent") in ("live", "upcoming"):
+        return True
+
     if live_details.get("actualStartTime"):
         return True
 
-    if snippet.get("liveBroadcastContent") in ("live", "upcoming"):
+    if live_details.get("actualEndTime"):
         return True
 
     return False
@@ -225,7 +231,7 @@ def send_discord(video, live=False):
     response.raise_for_status()
 
     print(
-        f"Discord HTTP {response.status_code}: "
+        f"Discord przyjął wiadomość HTTP {response.status_code}: "
         f"{'LIVE' if live else 'FILM'} — {video['title']}"
     )
 
@@ -235,13 +241,11 @@ def main():
 
     print("Sprawdzam kanał YouTube SRS...")
 
-    # 1. Wykryj aktywną transmisję.
+    # 1. Sprawdź aktywną transmisję.
     live = get_live()
     live_id = live["id"] if live else ""
 
     if live:
-        print(f"Wykryto aktywny LIVE: {live['title']}")
-
         if live_id not in state["live_history"]:
             send_discord(live, live=True)
 
@@ -252,22 +256,18 @@ def main():
 
             save_state(state)
         else:
-            print("Powiadomienie o tym LIVE było już wysłane.")
-    else:
-        print("Nie wykryto aktywnego LIVE.")
+            print("Ten LIVE ma już wysłane powiadomienie.")
 
-    # 2. Pobierz najnowsze filmy.
+    # 2. Pobierz filmy i sprawdź ich szczegóły.
     videos = get_latest_videos()
-
     details = get_video_details(
         [video["id"] for video in videos]
     )
 
     # 3. Pierwsze uruchomienie:
-    # zapamiętaj dotychczasowe materiały bez wysyłania
-    # powiadomień o starych filmach.
+    # zapamiętaj istniejące materiały bez ogłaszania ich.
     if not state["initialized"]:
-        print("Pierwsze uruchomienie — zapisywanie historii.")
+        print("Pierwsze uruchomienie — zapisuję dotychczasowe materiały.")
 
         for video in videos:
             video_id = video["id"]
@@ -287,37 +287,39 @@ def main():
         state["initialized"] = True
         save_state(state)
 
-        print("Zapisano istniejące materiały.")
+        print("Zapisano historię istniejących materiałów.")
         return
 
-    # 4. Sprawdź, czy pojawiły się nowe filmy.
-    # Najpierw przetwarzamy starsze, potem nowsze.
+    # 4. Sprawdź nowe materiały.
     for video in reversed(videos):
         video_id = video["id"]
 
-        # Nie wysyłaj aktywnej transmisji jako filmu.
+        # Nie ogłaszaj aktualnego LIVE jako filmu.
         if video_id == live_id:
             continue
 
-        # Nie wysyłaj materiału, dla którego już
-        # wysłano powiadomienie LIVE.
+        # Nie ogłaszaj ponownie transmisji już obsłużonej.
         if video_id in state["live_history"]:
             continue
 
         video_details = details.get(video_id, {})
 
-        # Nie wysyłaj zapisów transmisji jako zwykłych filmów.
+        # Pomiń zapis transmisji rozpoznany przez YouTube API.
         if is_live_archive(video_details):
             state["live_history"] = remember(
                 state["live_history"],
                 video_id
             )
+
+            save_state(state)
+            print(f"Pominięto zapis transmisji: {video['title']}")
             continue
 
-        # Nie wysyłaj ponownie już obsłużonego filmu.
+        # Nie wysyłaj ponownie znanych filmów.
         if video_id in state["videos"]:
             continue
 
+        # Wyślij powiadomienie o nowym zwykłym filmie.
         send_discord(video, live=False)
 
         state["videos"] = remember(
