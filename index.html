@@ -1,0 +1,181 @@
+
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SRS YouTube Bot</title>
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: #0b1020;
+      color: #f3f5fa;
+      font-family: Arial, sans-serif;
+    }
+
+    header {
+      padding: 24px 18px;
+      background: #121a2d;
+      border-bottom: 1px solid #29334a;
+    }
+
+    .logo {
+      color: #ff4057;
+      font-weight: bold;
+      font-size: 13px;
+      letter-spacing: 2px;
+    }
+
+    h1 { margin: 10px 0 5px; font-size: 27px; }
+    .muted { color: #9ca9c2; font-size: 14px; }
+
+    main {
+      max-width: 900px;
+      margin: auto;
+      padding: 18px;
+    }
+
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 16px;
+      background: #102a27;
+      border: 1px solid #23675a;
+      border-radius: 14px;
+      margin-bottom: 18px;
+    }
+
+    .dot {
+      width: 11px;
+      height: 11px;
+      background: #36d399;
+      border-radius: 50%;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .card {
+      background: #151e32;
+      border: 1px solid #29334a;
+      padding: 18px;
+      border-radius: 15px;
+      min-width: 0;
+    }
+
+    .card h2 { font-size: 16px; margin: 0 0 12px; }
+    .number { font-size: 25px; font-weight: bold; }
+    .description { color: #9ca9c2; font-size: 13px; margin-top: 8px; }
+
+    .wide { grid-column: 1 / -1; }
+
+    a.button, button {
+      display: inline-block;
+      border: 0;
+      border-radius: 9px;
+      background: #e8334d;
+      color: white;
+      padding: 12px 15px;
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    a.secondary {
+      background: #25334d;
+      margin-left: 5px;
+    }
+
+    .notice {
+      color: #f6cb79;
+      background: #302718;
+      border: 1px solid #634b25;
+      padding: 12px;
+      border-radius: 10px;
+      line-height: 1.5;
+      font-size: 13px;
+    }
+
+    footer {
+      text-align: center;
+      padding: 25px;
+      color: #75829c;
+      font-size: 12px;
+    }
+
+    @media (max-width: 520px) {
+      .grid { grid-template-columns: 1fr; }
+      .wide { grid-column: auto; }
+      h1 { font-size: 24px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">SIM RACING SQUAD</div>
+    <h1>🎮 SRS YouTube Bot</h1>
+    <div class="muted">Panel zarządzania powiadomieniami YouTube</div>
+  </header>
+
+  <main>
+    <div class="status">
+      <span class="dot"></span>
+      <div>
+        <strong>Panel uruchomiony</strong>
+        <div class="muted">Strona działa. Status bota sprawdzisz w GitHub Actions.</div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <section class="card">
+        <h2>🔴 Transmisje LIVE</h2>
+        <div class="number">YouTube</div>
+        <div class="description">Powiadomienia o transmisjach na Discordzie.</div>
+        <p><a class="button" href="https://studio.youtube.com/" target="_blank" rel="noopener">YouTube Studio</a></p>
+      </section>
+
+      <section class="card">
+        <h2>🎬 Filmy</h2>
+        <div class="number">YouTube</div>
+        <div class="description">Powiadomienia o nowych filmach na kanale SRS.</div>
+        <p><a class="button" href="https://www.youtube.com/" target="_blank" rel="noopener">Otwórz YouTube</a></p>
+      </section>
+
+      <section class="card wide">
+        <h2>⚙️ Automatyzacja bota</h2>
+        <p class="muted">
+          Tutaj sprawdzisz wykonania skryptu, harmonogram i ewentualne błędy.
+        </p>
+        <a class="button" href="https://github.com/davidkusmierz-pixel/SRS-YouTube-Bot/actions">
+          GitHub Actions
+        </a>
+        <a class="button secondary"
+           href="https://github.com/davidkusmierz-pixel/SRS-YouTube-Bot">
+          Repozytorium
+        </a>
+      </section>
+
+      <section class="card wide">
+        <h2>📋 Informacje</h2>
+        <p class="muted">
+          Panel jest stroną informacyjną. Nie odczytuje jeszcze rzeczywistego
+          statusu bota ani historii wysłanych filmów.
+        </p>
+        <div class="notice">
+          Bezpieczeństwo: nie wpisuj tutaj klucza YouTube API, tokenów ani
+          webhooka Discorda. Przechowuj je w GitHub Secrets.
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer>SRS • Sim Racing Squad • YouTube Bot</footer>
+</body>
+</html>
