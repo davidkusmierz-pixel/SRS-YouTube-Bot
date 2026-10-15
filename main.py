@@ -109,13 +109,13 @@ def get_new_regular_videos():
 
 def send_to_discord(item, kind):
     if kind == "live":
-        heading = "🔴 SRS OSTATNI LIVE"
-        content = f"🔴 **SRS — OSTATNI LIVE**"
+        heading = "🔴 SRS NADAJE NA ŻYWO!"
+        content = f"🔴 **🔴 SRS SIM RACING SQUAD — JESTEŚMY NA ŻYWO!**"
         color = 15158332
         action = "📺 [OGLĄDAJ TRANSMISJĘ]"
     else:
-        heading = "🎬 NOWY FILM SRS"
-        content = "🎬 **NOWY FILM SRS**"
+        heading = "🎬 🎬 NOWY FILM NA KANALE SRS!"
+        content = "🎬 **🎬 NOWY FILM NA KANALE SRS!**"
         color = 3447003
         action = "▶️ [OGLĄDAJ FILM]"
 
