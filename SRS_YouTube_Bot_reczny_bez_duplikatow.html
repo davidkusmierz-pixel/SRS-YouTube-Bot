@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SRS YouTube → Discord</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px 14px; background: #101218; color: #f4f5f7;
+    font-family: Arial, Helvetica, sans-serif;
+  }
+  .wrap { max-width: 680px; margin: 0 auto; }
+  header {
+    padding: 26px 20px; border-radius: 18px; text-align: center;
+    background: linear-gradient(135deg, #e3262e, #650d14);
+    box-shadow: 0 10px 30px #0005;
+  }
+  h1 { margin: 0 0 8px; font-size: clamp(24px, 5vw, 34px); }
+  header p { margin: 0; color: #ffe8e8; }
+  .card {
+    margin-top: 16px; padding: 20px; border-radius: 16px;
+    background: #1b1f29; border: 1px solid #303746;
+  }
+  h2 { margin: 0 0 14px; font-size: 19px; }
+  label { display: block; margin: 14px 0 6px; font-size: 14px; color: #d9deea; }
+  input {
+    width: 100%; padding: 12px; border: 1px solid #454d5e; border-radius: 9px;
+    background: #10141c; color: #fff; font-size: 15px;
+  }
+  button, .linkbtn {
+    display: block; width: 100%; padding: 14px 12px; margin-top: 12px;
+    border: 0; border-radius: 10px; font-weight: 700; font-size: 15px;
+    text-align: center; cursor: pointer; text-decoration: none;
+  }
+  .red { background: #e3262e; color: white; }
+  .gray { background: #343b4b; color: white; }
+  button:disabled { opacity: .55; cursor: wait; }
+  .hint { color: #aeb6c7; font-size: 13px; line-height: 1.55; }
+  #status {
+    white-space: pre-wrap; overflow-wrap: anywhere; margin-top: 14px; padding: 12px;
+    border-radius: 9px; background: #11151d; color: #dbe2ef; min-height: 44px;
+    font-size: 14px; line-height: 1.5;
+  }
+  .warn { color: #ffd58b; }
+  .ok { color: #91f0b0 !important; }
+  .bad { color: #ff9b9b !important; }
+  footer { color: #929bad; text-align: center; font-size: 12px; padding: 18px 8px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🏁 SRS YouTube Bot</h1>
+    <p>Wyślij ostatni LIVE lub najnowszy film na Discorda</p>
+  </header>
+
+  <section class="card">
+    <h2>🔐 Ustawienia</h2>
+    <label for="apiKey">Klucz API YouTube</label>
+    <input id="apiKey" type="password" autocomplete="off" placeholder="Wklej klucz API YouTube">
+    <label for="handle">Uchwyt kanału YouTube</label>
+    <input id="handle" value="@srs-dawid-y6q" placeholder="@nazwa-kanału">
+    <label for="webhook">Webhook Discorda</label>
+    <input id="webhook" type="password" autocomplete="off" placeholder="Wklej adres webhooka Discorda">
+    <p class="hint warn">Klucz API i webhook są zapisywane lokalnie w tej przeglądarce. Nie publikuj pliku z wpisanymi danymi ani nie udostępniaj webhooka.</p>
+  </section>
+
+  <section class="card">
+    <h2>📨 Wysyłanie na Discorda</h2>
+    <button id="liveBtn" class="red" onclick="sendLatest('live')">🔴 WYŚLIJ OSTATNI LIVE</button>
+    <button id="videoBtn" class="gray" onclick="sendLatest('video')">🎬 WYŚLIJ OSTATNI FILM</button>
+    <div id="status" role="status" aria-live="polite">Gotowe. Wpisz klucz API i webhook, a następnie wybierz przycisk.</div>
+  </section>
+
+  <section class="card">
+    <h2>ℹ️ Jak używać</h2>
+    <p class="hint">1. Wklej klucz YouTube Data API v3 i webhook kanału Discord.<br>
+    2. Zostaw uchwyt @srs-dawid-y6q albo wpisz uchwyt swojego kanału.<br>
+    3. Kliknij odpowiedni przycisk. Bot znajdzie materiał i wyśle tytuł oraz link na Discorda.<br>
+    4. Przy powiadomieniu LIVE bot oznaczy rolę Społeczność.</p>
+    <p class="hint">Wysyłasz powiadomienia ręcznie przyciskiem. Panel zapamiętuje identyfikatory wysłanych materiałów, więc zmiana miniaturki i ponowne kliknięcie przycisku nie wyśle drugi raz powiadomienia o tej samej transmisji. Zapisane LIVE nie będą też ponownie wysyłane jako zwykły film. Zapis działa w tej samej przeglądarce na tym urządzeniu.</p>
+  </section>
+  <footer>Plik lokalny SRS • Nie trzeba publikować go na GitHub Pages</footer>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const SETTINGS_KEY = 'srsYouTubePanelSettings';
+const COMMUNITY_ROLE_ID = '1511112360280981595';
+const SENT_ITEMS_KEY = 'srsYouTubeSentItems';
+
+function getSentItems() {
+  try {
+    const value = JSON.parse(localStorage.getItem(SENT_ITEMS_KEY) || '{}');
+    return value && typeof value === 'object' ? value : {};
+  } catch (_) { return {}; }
+}
+function wasAlreadySent(videoId) {
+  return Boolean(getSentItems()[videoId]);
+}
+function rememberSent(videoId, kind, messageUrl) {
+  const sent = getSentItems();
+  sent[videoId] = { kind, messageUrl, sentAt: new Date().toISOString() };
+  localStorage.setItem(SENT_ITEMS_KEY, JSON.stringify(sent));
+}
+
+function loadSettings() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
+    if (saved.apiKey) $('apiKey').value = saved.apiKey;
+    if (saved.webhook) $('webhook').value = saved.webhook;
+    if (saved.handle) $('handle').value = saved.handle;
+  } catch (_) {}
+}
+function saveSettings() {
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({
+      apiKey: $('apiKey').value.trim(),
+      webhook: $('webhook').value.trim(),
+      handle: $('handle').value.trim()
+    }));
+  } catch (_) {
+    setStatus('Nie udało się zapisać ustawień. Sprawdź, czy przeglądarka pozwala na localStorage.', 'bad');
+  }
+}
+['apiKey', 'webhook', 'handle'].forEach(id => {
+  $(id).addEventListener('change', saveSettings);
+  $(id).addEventListener('blur', saveSettings);
+});
+loadSettings();
+
+function setStatus(message, kind = '') {
+  const box = $('status');
+  box.textContent = message;
+  box.className = kind;
+}
+function cleanHandle(value) {
+  return value.trim().replace(/^@/, '');
+}
+async function yt(url, key) {
+  const separator = url.includes('?') ? '&' : '?';
+  const response = await fetch(url + separator + 'key=' + encodeURIComponent(key));
+  const data = await response.json();
+  if (!response.ok || data.error) {
+    throw new Error(data?.error?.message || `YouTube API zwróciło błąd HTTP ${response.status}.`);
+  }
+  return data;
+}
+async function resolveChannel(key, handle) {
+  const data = await yt(
+    'https://www.googleapis.com/youtube/v3/channels?part=snippet,contentDetails&forHandle=' +
+    encodeURIComponent(handle), key
+  );
+  if (!data.items || !data.items.length) {
+    throw new Error('Nie znaleziono kanału. Sprawdź uchwyt kanału, np. @srs-dawid-y6q.');
+  }
+  return data.items[0];
+}
+async function getRecentUploads(key, playlistId) {
+  const data = await yt(
+    'https://www.googleapis.com/youtube/v3/playlistItems?part=contentDetails,snippet&maxResults=50&playlistId=' +
+    encodeURIComponent(playlistId), key
+  );
+  const ids = (data.items || [])
+    .map(item => item.contentDetails && item.contentDetails.videoId)
+    .filter(Boolean);
+  if (!ids.length) throw new Error('Nie znaleziono filmów na tym kanale.');
+  const videos = await yt(
+    'https://www.googleapis.com/youtube/v3/videos?part=snippet,liveStreamingDetails,contentDetails&id=' +
+    ids.map(encodeURIComponent).join(','), key
+  );
+  const byId = new Map((videos.items || []).map(v => [v.id, v]));
+  return ids.map(id => byId.get(id)).filter(Boolean);
+}
+async function postToDiscord(webhook, video, kind) {
+  const isLive = kind === 'live';
+  const title = video.snippet?.title || (isLive ? 'Transmisja LIVE' : 'Nowy film');
+  const url = `https://www.youtube.com/watch?v=${video.id}`;
+  const content = isLive
+    ? `<@&${COMMUNITY_ROLE_ID}> 🔴 SRS NADAJE NA ŻYWO!`
+    : '🎬 NOWY FILM NA KANALE SRS!';
+  const embedTitle = isLive
+    ? 'SRS SIM RACING SQUAD — JESTEŚMY NA ŻYWO!'
+    : '🎬 NOWY FILM SRS!';
+  const thumb = video.snippet?.thumbnails?.maxres?.url
+    || video.snippet?.thumbnails?.high?.url
+    || video.snippet?.thumbnails?.medium?.url;
+  const description = isLive
+    ? `🏁 **${title.slice(0, 200)}**\n\n🏎️ Gran Turismo 7\n🔥 Wpadaj na transmisję i kibicuj ekipie SRS!\n\n📺 [OGLĄDAJ NA ŻYWO](${url})`
+    : `🏁 **${title.slice(0, 200)}**\n\n🏎️ Sim Racing Squad | Gran Turismo 7\n\n📺 [OBEJRZYJ FILM](${url})`;
+  const payload = {
+    username: 'SRS YouTube LIVE',
+    content,
+    embeds: [{
+      title: embedTitle,
+      url,
+      description,
+      color: isLive ? 15158332 : 5763719,
+      image: thumb ? { url: thumb } : undefined,
+      footer: { text: 'Sim Racing Squad • Gran Turismo 7' }
+    }],
+    allowed_mentions: {
+      parse: [],
+      roles: isLive ? [COMMUNITY_ROLE_ID] : []
+    }
+  };
+  const response = await fetch(webhook, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  if (!response.ok) {
+    let detail = '';
+    try { detail = await response.text(); } catch (_) {}
+    throw new Error(`Discord odrzucił wiadomość (HTTP ${response.status}). ${detail.slice(0, 250)}`);
+  }
+  rememberSent(video.id, kind, url);
+  return url;
+}
+async function sendLatest(kind) {
+  const key = $('apiKey').value.trim();
+  const webhook = $('webhook').value.trim();
+  const handle = cleanHandle($('handle').value);
+  saveSettings();
+  if (!key || !webhook || !handle) {
+    setStatus('Uzupełnij klucz API YouTube, uchwyt kanału i webhook Discorda.', 'bad');
+    return;
+  }
+  if (!/^https:\/\/(discord\.com|discordapp\.com)\/api\/webhooks\//i.test(webhook)) {
+    setStatus('Adres webhooka nie wygląda prawidłowo. Wklej pełny adres webhooka Discorda.', 'bad');
+    return;
+  }
+  const buttons = [$('liveBtn'), $('videoBtn')];
+  buttons.forEach(b => b.disabled = true);
+  setStatus('Sprawdzam kanał YouTube i szukam materiału…');
+  try {
+    const channel = await resolveChannel(key, handle);
+    const playlistId = channel.contentDetails?.relatedPlaylists?.uploads;
+    if (!playlistId) throw new Error('Nie udało się odczytać listy filmów kanału.');
+    const videos = await getRecentUploads(key, playlistId);
+    let chosen;
+    if (kind === 'live') {
+      chosen = videos.find(v => v.liveStreamingDetails);
+      if (!chosen) {
+        throw new Error('Nie znaleziono zarchiwizowanej transmisji LIVE w ostatnich 50 materiałach kanału.');
+      }
+    } else {
+      chosen = videos.find(v => !v.liveStreamingDetails);
+      if (!chosen) throw new Error('Nie znaleziono zwykłego filmu w ostatnich materiałach kanału.');
+    }
+    if (wasAlreadySent(chosen.id)) {
+      const sentItem = getSentItems()[chosen.id];
+      const sentType = sentItem?.kind === 'live' ? 'LIVE' : 'film';
+      setStatus(
+        `ℹ️ To powiadomienie zostało już wysłane.\\nNie wysyłam duplikatu, nawet jeśli zmieniła się miniaturka.\\nTyp poprzedniego powiadomienia: ${sentType}.\\n${sentItem?.messageUrl || `https://www.youtube.com/watch?v=${chosen.id}`}`,
+        'ok'
+      );
+      return;
+    }
+    const url = await postToDiscord(webhook, chosen, kind);
+    setStatus(`✅ Wysłano na Discorda!\n${chosen.snippet?.title || 'Materiał YouTube'}\n${url}`, 'ok');
+  } catch (error) {
+    setStatus('❌ Nie udało się wysłać.\n' + error.message +
+      '\n\nJeśli pojawi się błąd CORS lub Failed to fetch, przeglądarka blokuje połączenie bezpośrednie. Wtedy potrzebny będzie mały lokalny program pomocniczy zamiast samego HTML.', 'bad');
+  } finally {
+    buttons.forEach(b => b.disabled = false);
+  }
+}
+</script>
+</body>
+</html>
